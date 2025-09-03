@@ -1,40 +1,45 @@
 import path from 'node:path';
 import fs from 'fs/promises';
-
-type StatResultDates = {
-    created: number;
-    modified: number;
-    accessed: number;
-};
+import FS_ERRORS from './fs-errors';
 
 export type StatResult = {
-    name: string;
-    dir: boolean;
-    size: number;
-    dates: StatResultDates;
+    name: string; // filename
+    dir: boolean; // true if this is a directory
+    size: number; // size of this file
+    ctime: number; // timestamp in seconds of file creation
+    mtime: number; // timestamp of file last modification
+    atime: number; // timestamp of file last opening
 };
 
 /**
  * Returns a structure describe the specified file
  * @param sFile a filename
  */
-export async function stat(sFile: string): Promise<StatResult | undefined> {
+async function stat(sFile: string): Promise<StatResult | undefined> {
+    const st = await fs.stat(sFile);
+    const pp = path.parse(sFile);
+    return {
+        name: pp.base,
+        dir: st.isDirectory(),
+        size: st.size,
+        ctime: Math.floor(st.birthtimeMs / 1000),
+        mtime: Math.floor(st.mtimeMs / 1000),
+        atime: Math.floor(st.atimeMs / 1000),
+    };
+}
+
+async function exists(sFile: string): Promise<boolean> {
     try {
-        const st = await fs.stat(sFile);
-        const pp = path.parse(sFile);
-        return {
-            name: pp.base,
-            dir: st.isDirectory(),
-            size: st.size,
-            dates: {
-                created: Math.floor(st.birthtimeMs / 1000),
-                modified: Math.floor(st.mtimeMs / 1000),
-                accessed: Math.floor(st.atimeMs / 1000),
-            },
-        };
+        await stat(sFile);
+        return true;
     } catch {
-        return undefined;
+        return false;
     }
+}
+
+async function isDirectory(sFile: string): Promise<boolean> {
+    const oStat = await stat(sFile);
+    return oStat?.dir ?? false;
 }
 
 /**
@@ -43,12 +48,9 @@ export async function stat(sFile: string): Promise<StatResult | undefined> {
  * @param sPath
  */
 export async function mkdir(sPath: string): Promise<void> {
-    const sParent = path.dirname(sPath);
-    if (!(await stat(sParent))) {
-        await mkdir(sParent);
-    }
-    if (!(await stat(sPath))) {
-        return mkdir(sPath);
+    if (await stat(sPath)) {
+        return fs.mkdir(sPath, { recursive: true });
+    } else {
     }
 }
 
