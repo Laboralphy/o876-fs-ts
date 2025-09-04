@@ -3,7 +3,7 @@ import fs from 'fs/promises';
 import { Stats as Stats } from 'fs';
 import { Dirent, MakeDirectoryOptions, ObjectEncodingOptions, PathLike } from 'node:fs';
 
-export type StatResult = {
+type StatResult = {
     name: string; // filename
     dir: boolean; // true if this is a directory
     size: number; // size of this file
@@ -12,22 +12,13 @@ export type StatResult = {
     atime: number; // timestamp in milliseconds of file last opening
 };
 
-/**
- * Default .ls return type
- */
-type LsSimpleResult = {
-    name: string;
-    dir: boolean;
-};
-
-type LsOptions = {
-    stat?: boolean; // if true : return a StatResult instead of a LsSimpleResult
+type RecursiveOptions = {
     recursive?: boolean;
 };
 
-// type ReadOptions = {
-//     binary: boolean; // if true : the file content is treated as binary instead of utf-8
-// };
+type BinaryOptions = {
+    binary?: boolean;
+};
 
 interface IFileSystemModule {
     stat(sFile: PathLike): Promise<Stats>;
@@ -41,8 +32,10 @@ interface IFileSystemModule {
     ): Promise<Dirent[]>;
     rename(sOldPath: PathLike, sNewPath: PathLike): Promise<void>;
     unlink(sPath: PathLike): Promise<void>;
+    writeFile(sFile: PathLike, data: string | Buffer, options: ObjectEncodingOptions | undefined): Promise<void>
+    readFile(sFile: PathLike, options?: ObjectEncodingOptions): Promise<Buffer>
+    access(sFile: PathLike, nMode?: number): Promise<void>
 }
-
 /**
  * Common FS operations simplified
  */
@@ -53,7 +46,7 @@ export class FSHelper {
         if (customFileSystem) {
             this.fs = customFileSystem;
         } else {
-            this.fs = fs;
+            this.fs = fs as IFileSystemModule;
         }
     }
     /**
@@ -107,47 +100,57 @@ export class FSHelper {
     /**
      * List all files in specified directory
      * @param sPath location to be listed
-     * @param lsOptions listing options
+     * @param options listing options
      */
-    async ls(sPath: string, lsOptions: LsOptions = {}) {
-        const { stat = false, recursive = false } = lsOptions;
+    async ls(sPath: string, options: RecursiveOptions = {}): Promise<string[]> {
+        const { recursive = false } = options;
         const aDirEnts = await fs.readdir(sPath, {
             withFileTypes: true,
             recursive,
         });
         const aFiles = [];
         for (const d of aDirEnts) {
-            const dir = d.isDirectory();
-            const sPathToFile = path.resolve(d.parentPath, d.name);
-            const f = stat ? this.stat(sPathToFile) : sPathToFile;
+            const sEntryPath = path.join(d.parentPath, d.name)
+            if (recursive && d.isDirectory()) {
+                const aSubFolderFiles = await this.ls(sEntryPath, options);
+                for (const sf of aSubFolderFiles) {
+                    aFiles.push(sf);
+                }
+            } else {
+                aFiles.push(sEntryPath);
+            }
         }
-        /*
-        if (lsOptions.stat) {
-            return list.map((f) => ({
-                name: f.name,
-                dir: f.isDirectory(),
-            }));
-        } else {
-            return Promise.all(list.map((f: Dirent) => f.name));
-        }*/
+        return aFiles
+    }
+
+    lsr(sPath: string): Promise<string[]> {
+        return this.ls(sPath, { recursive: true })
     }
 
     /**
      * Remove the specified file,
      * If directory is specified, remove all files and folders recursively inside the specified directory
      * @param sFile location or file name to be removed
+     * @param options
      */
-    async rm(sFile: string): Promise<void> {
+    async rm(sFile: string, options: RecursiveOptions): Promise<void> {
         const s = await this.stat(sFile);
-        if (s) {
-            if (s.dir) {
-                // recursively rm all files
-                const sPath = path.resolve(sFile, s.name);
-                const aFiles = await this.ls(sPath);
-                await Promise.all(aFiles.map((f) => this.rm(path.join(sPath, f.name))));
-            }
-            return fs.unlink(sFile);
+        console.log('rm', sFile)
+        if (s.dir && options.recursive) {
+            // recursively rm all files
+            const sPath = path.resolve(sFile, s.name);
+            console.log(sFile, s.name, sPath)
+            const aFiles = await this.ls(sPath);
+            await Promise.all(aFiles.map((f) =>
+                this.rm(path.join(sPath, f), options)));
+        } else {
+            console.log('rm', sFile)
+            // return fs.unlink(sFile);
         }
+    }
+
+    async rmr(sPath: string): Promise<void> {
+        return this.rm(sPath, { recursive: true });
     }
 
     /**
@@ -158,85 +161,73 @@ export class FSHelper {
     async mv(sOld: string, sNew: string): Promise<void> {
         return fs.rename(sOld, sNew);
     }
-}
-//
-// /**
-//  * read file content as utf8
-//  */
-// export async function read(
-//     sFile: string,
-//     options: ReadOptions = { binary: false }
-// ): Promise<Buffer> {
-//     return fs.readFile(
-//         sFile,
-//         options.binary
-//             ? null
-//             : {
-//                   encoding: 'utf8',
-//               }
-//     );
-// }
-//
-// /**
-//  * writes a file
-//  * @param sFile {string}
-//  * @param data {string}
-//  * @returns {Promise<unknown>}
-//  */
-// export async function write(sFile: string, data: string | Buffer): Promise<void> {
-//     return fs.writeFile(
-//         sFile,
-//         data,
-//         typeof data === 'string'
-//             ? {
-//                   encoding: 'utf8',
-//               }
-//             : null
-//     );
-// }
-//
-// export async function access(sFile: string, rights: string = ''): Promise<boolean> {
-//     const nMode: number = rights
-//         .toLowerCase()
-//         .split('')
-//         .map((r: string) => {
-//             switch (r) {
-//                 case 'r': {
-//                     return fs.constants.R_OK;
-//                 }
-//
-//                 case 'w': {
-//                     return fs.constants.W_OK;
-//                 }
-//
-//                 case 'x': {
-//                     return fs.constants.X_OK;
-//                 }
-//
-//                 default: {
-//                     throw new Error('PromFS Access : does not compute : ' + r);
-//                 }
-//             }
-//         })
-//         .reduce((prev, curr) => prev | curr, 0);
-//     await fs.access(sFile, nMode);
-// }
-//
-// export async function tree(sPath) {
-//     const aFiles = await ls(sPath);
-//     const aEntries = [];
-//     for (let i = 0, l = aFiles.length; i < l; ++i) {
-//         const { name, dir } = aFiles[i];
-//         if (dir) {
-//             const sDirName = path.join(sPath, name);
-//             const aSubList = await tree(sDirName);
-//             aEntries.push(...aSubList.map((f) => path.join(name, f)));
-//         } else {
-//             aEntries.push(name);
-//         }
-//     }
-//     return aEntries;
-// }
 
-const f = new FSHelper();
-f.ls('../.idea').then((x) => console.log(x));
+    /**
+     * writes a file
+     * @param sFile {string}
+     * @param data {string}
+     * @returns {Promise<unknown>}
+     */
+    async write(sFile: string, data: string | Buffer): Promise<void> {
+        return this.fs.writeFile(
+            sFile,
+            data,
+            typeof data === 'string'
+                ? {
+                    encoding: 'utf8',
+                }
+                : undefined
+        );
+    }
+
+    /**
+     * read file content as utf8
+     */
+    async read(
+        sFile: string,
+        options: BinaryOptions = { binary: false }
+    ): Promise<string | Buffer> {
+        const opts: ObjectEncodingOptions | undefined = options.binary
+            ? undefined
+            : { encoding: 'utf8' }
+        const data = await this.fs.readFile(sFile, opts);
+        return options.binary
+            ? data
+            : data.toString();
+    }
+
+    /**
+     * Attempt to access specified file or directory
+     * Throws an Error if unreachable
+     * @param sFile
+     * @param rights
+     */
+    async access(sFile: string, rights: string = ''): Promise<void> {
+        const nMode: number = rights == ''
+            ? fs.constants.F_OK
+            : rights
+                .toLowerCase()
+                .split('')
+                .map((r: string) => {
+                    switch (r) {
+                        case 'r': {
+                            return fs.constants.R_OK;
+                        }
+
+                        case 'w': {
+                            return fs.constants.W_OK;
+                        }
+
+                        case 'x': {
+                            return fs.constants.X_OK;
+                        }
+
+                        default: {
+                            throw new Error(`expected parameters : a string of 'r', 'w', and 'x'`);
+                        }
+                    }
+                })
+                .reduce((prev, curr) => prev | curr, 0);
+        await this.fs.access(sFile, nMode);
+    }
+}
