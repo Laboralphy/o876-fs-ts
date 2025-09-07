@@ -1,5 +1,4 @@
-// eslint-disable-next-line no-undef
-module.exports = {
+export default {
     preset: 'ts-jest',
     testEnvironment: 'node',
     testMatch: ['**/*.test.ts'],
