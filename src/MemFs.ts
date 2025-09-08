@@ -1,150 +1,185 @@
-import { FsStatResult, IFileSystemModule, RecursiveOptions } from './index';
+import {
+    EncodingOptions,
+    ForceOptions,
+    FsReadDirResult,
+    FsStatResult,
+    IFileSystemModule,
+    ReadDirOptions,
+    RecursiveOptions,
+} from './IFileSystemModule';
 import path from 'node:path';
+import { MemObject } from './MemObject';
 
-type MemFsEntry = {
-    id: number;
-    parentId: number;
-    fsStat: FsStatResult;
-    content: string;
-};
+export class MemFs implements IFileSystemModule {
+    private _root = new MemObject('.', true);
 
-function _true() {
-    return true;
-}
-
-function _false() {
-    return false;
-}
-
-class MemObject {
-    private children: Map<string, MemObject> = new Map<string, MemObject>();
-    private name: string;
-    private id: number;
-    private parentId: number;
-    private fsStat: FsStatResult;
-    private _content: string
-
-    constructor (name: string, id: number, parentId: number, bFolder) {
-        const d = Date.now();
-        this.id = id;
-        this.parentId = parentId;
-        this.name = name;
-        this.fsStat = {
-            size: 0,
-            birthtimeMs: d,
-            mtimeMs: d,
-            atimeMs: d,
-            isDirectory():boolean { return bFolder }
-        }
-        this._content = ''
+    get fileMap(): string[] {
+        const getFileMap = (oNode: MemObject): string[] => {
+            const aResult = [];
+            if (oNode.isDirectory) {
+                for (const child of oNode.getChildren()) {
+                    aResult.push(child.fullname);
+                    if (child.isDirectory) {
+                        getFileMap(child).forEach((f) => {
+                            aResult.push(f);
+                        });
+                    }
+                }
+            }
+            return aResult;
+        };
+        return getFileMap(this._root).sort();
     }
 
-    set content (data: string) {
-        this._content = data;
-        this.fsStat.size = data.length
-    }
-
-    get content () : string {
-        return this._content
-    }
-
-    addChild (child: MemObject) {
-        if (this.fsStat.isDirectory()) {
-
-        } else {
-            throw new Error(`illegal : not a folder`)
-        }
-    }
-}
-
-class MemFs implements IFileSystemModule {
-    private files: Map<string, MemFsEntry> = new Map<string, MemFsEntry>();
-
-    async access(sPath: string, nMode?: number): Promise<void> {
-        sPath = path.normalize(sPath);
-        if (!this.files.has(sPath)) {
-            throw new Error(`file not found ${sPath}`);
-        }
-    }
-
-    mkdir(sPath: string, options: RecursiveOptions): Promise<string | undefined> {
+    async mkdir(sPath: string, options?: RecursiveOptions): Promise<undefined> {
         sPath = path.normalize(sPath);
         const aParts = sPath.split('/');
-        let sCurrent = ''
-        for (const sPart of aParts) {
-            sCurrent = path.join(sCurrent, sPart)
-            if ()
-        }
-        if (options.recursive) {
-            const sParentPath = path.basename(sPath);
-            if (sParentPath != '.') {
-                if (!this._exists(sParentPath)) {
-
+        if (options && options.recursive) {
+            let oCurrent: MemObject = this._root;
+            for (const sCurrent of aParts) {
+                if (!oCurrent.hasChild(sCurrent)) {
+                    oCurrent.addChild(new MemObject(sCurrent, true));
                 }
-            } else {
-
+                oCurrent = oCurrent.getChild(sCurrent);
+            }
+        } else {
+            const sLastPart = aParts.pop();
+            if (sLastPart != undefined) {
+                const oParent = this._root.lookup(aParts.join('/'));
+                oParent.addChild(new MemObject(sLastPart, true));
             }
         }
-        if (!this.files.has(sPath)) {
-            const d = Date.now();
-            this.files.set(sPath, {
-                content: '',
-                fsStat: {
-                    size: 0,
-                    mtimeMs: d,
-                    atimeMs: d,
-                    birthtimeMs: d,
-                    isDirectory: _true,
-                },
-            });
+    }
+
+    async readFile(sPath: string, options?: EncodingOptions): Promise<Buffer | string> {
+        const bString = options && options.encoding == 'utf8';
+        sPath = path.normalize(sPath);
+        const oFile = this._root.lookup(sPath);
+        return bString ? oFile.content : Buffer.from(oFile.content);
+    }
+
+    async readdir(sPath: string, options?: ReadDirOptions): Promise<FsReadDirResult[]> {
+        sPath = path.normalize(sPath);
+        const oLocation = this._root.lookup(sPath);
+        const getChildrenOf = function (
+            oNode: MemObject,
+            sParentPath: string = ''
+        ): FsReadDirResult[] {
+            const aResult: FsReadDirResult[] = [];
+            for (const k of oNode.children.values()) {
+                aResult.push({
+                    name: k.name,
+                    parentPath: sParentPath == '' ? '.' : sParentPath,
+                    isDirectory: k.fsStat.isDirectory,
+                });
+                if (k.isDirectory) {
+                    aResult.push(...getChildrenOf(k, path.join(sParentPath, k.name)));
+                }
+            }
+            return aResult;
+        };
+        if (options && options.recursive) {
+            return getChildrenOf(this._root.lookup(sPath));
+        } else {
+            return oLocation.getChildren().map(
+                (x: MemObject): FsReadDirResult => ({
+                    name: x.name,
+                    parentPath: sPath == '' ? '.' : sPath,
+                    isDirectory: x.fsStat.isDirectory,
+                })
+            );
         }
-        return Promise.resolve(undefined);
     }
 
-    readFile(sPath: string, options?: EncodingOptions): Promise<Buffer> {
-        return Promise.resolve(undefined);
+    async rename(sOldPath: string, sNewPath: string): Promise<void> {
+        sOldPath = path.normalize(sOldPath);
+        sNewPath = path.normalize(sNewPath);
+        const sBaseNewName = path.basename(sNewPath);
+        const sDirNewName = path.dirname(sNewPath);
+        const oLocation = this._root.lookup(sOldPath);
+        const oParentLocation = oLocation.parent;
+        // remove location from current location
+        oParentLocation!.removeChild(oLocation);
+        // rename child
+        oLocation.name = sBaseNewName;
+        // put renamed child to new location
+        const oNewLocation = this._root.lookup(sDirNewName);
+        oNewLocation.addChild(oLocation);
     }
 
-    readdir(sLocation: string, options: ReadDirOptions): Promise<FsReadDirResult[]> {
-        return Promise.resolve([]);
-    }
-
-    rename(sOldPath: string, sNewPath: string): Promise<void> {
-        return Promise.resolve(undefined);
-    }
-
-    rm(sPath: string, options?: RecursiveOptions & ForceOptions): Promise<void> {
-        return Promise.resolve(undefined);
-    }
-
-    async _exists(sPath: string) {
+    async rm(sPath: string, options?: RecursiveOptions & ForceOptions): Promise<void> {
+        sPath = path.normalize(sPath);
+        const recursive = options?.recursive ?? false;
+        const force = options?.force ?? false;
         try {
-            await this.stat(sPath);
-            return true;
-        } catch {
-            return false;
+            const oFile = this._root.lookup(sPath);
+            const nOpt = (recursive ? 2 : 0) | (force ? 1 : 0);
+            const removeFile = () => {
+                oFile.parent?.removeChild(oFile);
+            };
+            const bHasChildren = oFile.isDirectory && oFile.children.size > 0;
+            switch (nOpt) {
+                // no force, no recursive
+                case 0: {
+                    // Should only delete file or empty folder
+                    if (bHasChildren) {
+                        throw new Error('cannot remove non-empty folder (use recursive)');
+                    } else {
+                        // Regular file or empty folder
+                        removeFile();
+                    }
+                    break;
+                }
+                // FORCE only : do not throw error
+                case 1: {
+                    if (!bHasChildren) {
+                        removeFile();
+                    }
+                    break;
+                }
+                // RECURSIVE only
+                case 2: {
+                    oFile.truncate();
+                    break;
+                }
+                // FORCE & RECURSIVE
+                case 3: {
+                    oFile.truncate();
+                    break;
+                }
+            }
+        } catch (e) {
+            if (recursive) {
+                return;
+            } else {
+                throw e;
+            }
         }
     }
 
     async stat(sPath: string): Promise<FsStatResult> {
         sPath = path.normalize(sPath);
-        const r: MemFsEntry | undefined = this.files.get(sPath);
-        if (r) {
-            return r.fsStat;
-        } else {
-            throw new Error(`file not found ${sPath}`);
-        }
+        const oFile = this._root.lookup(sPath);
+        return oFile.fsStat;
     }
 
-    unlink(sPath: string): Promise<void> {
-        return Promise.resolve(undefined);
-    }
-
-    writeFile(
+    async writeFile(
         sPath: string,
         data: string | Buffer,
-        options: EncodingOptions | undefined
+        options?: EncodingOptions
     ): Promise<void> {
-        return Promise.resolve(undefined);
+        sPath = path.normalize(sPath);
+        try {
+            const oFile = this._root.lookup(sPath);
+            oFile.content = data.toString();
+            return;
+        } catch {}
+        const bString = options && options.encoding == 'utf8';
+        const sFileName = path.basename(sPath);
+        const sDirName = path.dirname(sPath);
+        const oFileFolder = this._root.lookup(sDirName);
+        const oNewFile = new MemObject(sFileName, false);
+        oNewFile.content = bString && typeof data == 'string' ? data : data.toString();
+        oFileFolder.addChild(oNewFile);
     }
 }

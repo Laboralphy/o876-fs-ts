@@ -1,5 +1,14 @@
 import path from 'node:path';
 import fs from 'fs/promises';
+import {
+    BinaryOptions,
+    EncodingOptions,
+    ForceOptions,
+    FsReadDirResult,
+    FsStatResult,
+    IFileSystemModule,
+    RecursiveOptions,
+} from './IFileSystemModule';
 
 export type StatResult = {
     name: string; // filename
@@ -10,60 +19,10 @@ export type StatResult = {
     atime: number; // timestamp in milliseconds of file last opening
 };
 
-export type RecursiveOptions = {
-    recursive?: boolean;
-};
-
-export type ForceOptions = {
-    force?: boolean;
-};
-
-export type BinaryOptions = {
-    binary?: boolean;
-};
-
-export type EncodingOptions = {
-    encoding?: string;
-};
-
-export interface FsStatResult {
-    isDirectory(): boolean;
-    size: number;
-    birthtimeMs: number;
-    mtimeMs: number;
-    atimeMs: number;
-}
-
-export interface FsReadDirResult {
-    isDirectory(): boolean;
-    name: string;
-    parentPath: string;
-}
-
-export type ReadDirOptions = {
-    withFileTypes: true;
-    recursive?: boolean | undefined;
-};
-
-export interface IFileSystemModule {
-    stat(sPath: string): Promise<FsStatResult>;
-    mkdir(sPath: string, options: RecursiveOptions): Promise<string | undefined>;
-    readdir(sLocation: string, options: ReadDirOptions): Promise<FsReadDirResult[]>;
-    rename(sOldPath: string, sNewPath: string): Promise<void>;
-    unlink(sPath: string): Promise<void>;
-    writeFile(
-        sPath: string,
-        data: string | Buffer,
-        options: EncodingOptions | undefined
-    ): Promise<void>;
-    readFile(sPath: string, options?: EncodingOptions): Promise<Buffer>;
-    access(sPath: string, nMode?: number): Promise<void>;
-    rm(sPath: string, options?: RecursiveOptions & ForceOptions): Promise<void>;
-}
 /**
  * Common FS operations simplified
  */
-export class FSHelper {
+export class FsHelper {
     private readonly fs: IFileSystemModule;
 
     constructor(customFileSystem?: IFileSystemModule | undefined) {
@@ -182,43 +141,5 @@ export class FSHelper {
         const opts: EncodingOptions | undefined = options.binary ? undefined : { encoding: 'utf8' };
         const data = await this.fs.readFile(sPath, opts);
         return options.binary ? data : data.toString();
-    }
-
-    /**
-     * Attempt to access specified file or directory
-     * Throws an Error if unreachable
-     * @param sPath
-     * @param rights
-     */
-    async access(sPath: string, rights: string = ''): Promise<void> {
-        const nMode: number =
-            rights == ''
-                ? fs.constants.F_OK
-                : rights
-                      .toLowerCase()
-                      .split('')
-                      .map((r: string) => {
-                          switch (r) {
-                              case 'r': {
-                                  return fs.constants.R_OK;
-                              }
-
-                              case 'w': {
-                                  return fs.constants.W_OK;
-                              }
-
-                              case 'x': {
-                                  return fs.constants.X_OK;
-                              }
-
-                              default: {
-                                  throw new Error(
-                                      `expected parameters : a string of 'r', 'w', and 'x'`
-                                  );
-                              }
-                          }
-                      })
-                      .reduce((prev, curr) => prev | curr, 0);
-        await this.fs.access(sPath, nMode);
     }
 }

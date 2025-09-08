@@ -2,7 +2,7 @@
   "name": "o876-fs-ts",
   "version": "1.0.0",
   "description": "",
-  "main": "src/index.ts",
+  "main": "src/FsHelper.ts",
   "type": "module",
   "scripts": {
     "test": "jest",
