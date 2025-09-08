@@ -26,3 +26,33 @@ describe('mkdir', () => {
         ]);
     });
 });
+
+describe('readFile/writeFile', () => {
+    it('should return "CONTENT" when writing "CONTENT" in a file', async () => {
+        const m = new MemFs();
+        await m.writeFile('test-file', 'CONTENT');
+        const s = await m.readFile('test-file', { encoding: 'utf8' });
+        expect(s).toBe('CONTENT');
+    });
+});
+
+describe('readdir', () => {
+    it('should return [] when reading root empty dir', async () => {
+        const m = new MemFs();
+        const aList = await m.readdir('.');
+        expect(aList).toEqual([]);
+    });
+    it('should return [] when reading root empty dir', async () => {
+        const m = new MemFs();
+        m.mkdir('pom');
+        m.mkdir('pim');
+        m.mkdir('pam');
+        m.mkdir('pim/poum', { recursive: true });
+        m.mkdir('pim/pouf', { recursive: true });
+        m.mkdir('pim/poush', { recursive: true });
+        m.writeFile('pim/poush/test1', 'test');
+        const aList = await m.readdir('.');
+        const aNames = aList.map((f) => f.name);
+        expect(aNames).toEqual(['pom', 'pim', 'pam']);
+    });
+});

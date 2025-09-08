@@ -1,35 +1,41 @@
-import { FsStatResult } from './IFileSystemModule';
-
 export class MemObject {
     private static idCounter: number = 0;
     private readonly _children: Map<string, MemObject> | undefined;
     private _name: string;
     private readonly _id: number;
-    private readonly _fsStat: FsStatResult;
     private _parent: MemObject | null = null;
     private _content: string;
+    private _ctime: number;
+    private _atime: number;
+    private _mtime: number;
 
     constructor(name: string, bFolder: boolean) {
         const d = Date.now();
         this._id = ++MemObject.idCounter;
         this._name = name;
-        this._fsStat = {
-            size: 0,
-            birthtimeMs: d,
-            mtimeMs: d,
-            atimeMs: d,
-            isDirectory(): boolean {
-                return bFolder;
-            },
-        };
+        this._ctime = d;
+        this._mtime = d;
+        this._atime = d;
         if (bFolder) {
             this._children = new Map<string, MemObject>();
         }
         this._content = '';
     }
 
-    get fsStat(): FsStatResult {
-        return this._fsStat;
+    get size(): number {
+        return this.content.length;
+    }
+
+    get ctime(): number {
+        return this._ctime;
+    }
+
+    get mtime(): number {
+        return this._mtime;
+    }
+
+    get atime(): number {
+        return this._atime;
     }
 
     get isDirectory(): boolean {
@@ -57,19 +63,18 @@ export class MemObject {
     }
 
     set content(data: string) {
-        if (this._fsStat.isDirectory()) {
+        if (this.isDirectory) {
             throw new Error('illegal : cannot set content to a folder');
         }
         this._content = data;
-        this._fsStat.size = data.length;
-        this._fsStat.mtimeMs = Date.now();
+        this._mtime = Date.now();
     }
 
     get content(): string {
-        if (this._fsStat.isDirectory()) {
+        if (this.isDirectory) {
             throw new Error('illegal : cannot get content from a folder');
         }
-        this._fsStat.atimeMs = Date.now();
+        this._atime = Date.now();
         return this._content;
     }
 
@@ -108,6 +113,9 @@ export class MemObject {
     }
 
     lookup(sPath: string): MemObject {
+        if (sPath == '.') {
+            return this;
+        }
         const aPath = sPath.split('/');
         const sSearch = aPath.shift() ?? '';
         if (sSearch != '') {

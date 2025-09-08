@@ -70,7 +70,9 @@ export class MemFs implements IFileSystemModule {
                 aResult.push({
                     name: k.name,
                     parentPath: sParentPath == '' ? '.' : sParentPath,
-                    isDirectory: k.fsStat.isDirectory,
+                    isDirectory() {
+                        return k.isDirectory;
+                    },
                 });
                 if (k.isDirectory) {
                     aResult.push(...getChildrenOf(k, path.join(sParentPath, k.name)));
@@ -85,7 +87,9 @@ export class MemFs implements IFileSystemModule {
                 (x: MemObject): FsReadDirResult => ({
                     name: x.name,
                     parentPath: sPath == '' ? '.' : sPath,
-                    isDirectory: x.fsStat.isDirectory,
+                    isDirectory() {
+                        return x.isDirectory;
+                    },
                 })
             );
         }
@@ -160,7 +164,15 @@ export class MemFs implements IFileSystemModule {
     async stat(sPath: string): Promise<FsStatResult> {
         sPath = path.normalize(sPath);
         const oFile = this._root.lookup(sPath);
-        return oFile.fsStat;
+        return {
+            size: oFile.size,
+            atimeMs: oFile.atime,
+            mtimeMs: oFile.mtime,
+            birthtimeMs: oFile.ctime,
+            isDirectory(): boolean {
+                return oFile.isDirectory;
+            },
+        };
     }
 
     async writeFile(
