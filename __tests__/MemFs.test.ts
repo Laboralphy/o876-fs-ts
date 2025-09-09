@@ -1,5 +1,6 @@
 import { MemFs } from '../src/MemFs';
 import path from 'node:path';
+import { FsReadDirResult } from '../src/IFileSystemModule';
 
 describe('mkdir', () => {
     it('should create a directory', async () => {
@@ -52,7 +53,7 @@ describe('readdir', () => {
         m.mkdir('pim/pouf', { recursive: true });
         m.mkdir('pim/poush', { recursive: true });
         m.writeFile('pim/poush/test1', 'test');
-        const aNames = await m.readdir('.');
+        const aNames = (await m.readdir('.')).map((f) => path.join(f.parentPath, f.name));
         expect(aNames).toEqual(['pom', 'pim', 'pam']);
     });
     it('should return [pom, pim, pam, pim/poum, pim/pouf, pim/poush] when reading root dir', async () => {
@@ -65,7 +66,7 @@ describe('readdir', () => {
         m.mkdir('pim/poush', { recursive: true });
         m.writeFile('pim/poush/test1', 'test');
         const aList = await m.readdir('.', { recursive: true, withFileTypes: true });
-        expect(aList.map((f) => path.join(f.parentPath, f.name))).toEqual([
+        expect(aList.map((f: FsReadDirResult) => path.join(f.parentPath, f.name))).toEqual([
             'pom',
             'pim',
             'pim/poum',

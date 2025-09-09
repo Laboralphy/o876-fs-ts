@@ -60,7 +60,7 @@ export class MemFs implements IFileSystemModule {
     async readdir(
         sPath: string,
         options?: RecursiveOptions & { withFileTypes: true }
-    ): Promise<string[] | FsReadDirResult[]> {
+    ): Promise<FsReadDirResult[]> {
         sPath = path.normalize(sPath);
         const bRecursive = options && options.recursive;
         const oLocation = this._root.lookup(sPath);

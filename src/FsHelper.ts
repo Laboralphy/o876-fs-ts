@@ -78,10 +78,11 @@ export class FsHelper {
      */
     async ls(sPath: string, options: RecursiveOptions = { recursive: false }): Promise<string[]> {
         const { recursive = false } = options;
-        return this.fs.readdir(sPath, {
-            withFileTypes: false,
+        const aFiles = await this.fs.readdir(sPath, {
+            withFileTypes: true,
             recursive,
         });
+        return aFiles.map((f) => path.join(f.parentPath, f.name));
     }
 
     /**
