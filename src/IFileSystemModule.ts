@@ -35,7 +35,10 @@ export interface FsReadDirResult {
 export interface IFileSystemModule {
     stat(sPath: string): Promise<FsStatResult>;
     mkdir(sPath: string, options?: RecursiveOptions): Promise<void>;
-    readdir(sPath: string, options?: ReadDirOptions): Promise<FsReadDirResult[]>;
+    readdir(
+        sPath: string,
+        options?: RecursiveOptions & { withFileTypes: true }
+    ): Promise<FsReadDirResult[]>;
     rename(sOldPath: string, sNewPath: string): Promise<void>;
     writeFile(sPath: string, data: string | Buffer, options?: EncodingOptions): Promise<void>;
     readFile(sPath: string, options?: EncodingOptions): Promise<Buffer | string>;

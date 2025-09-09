@@ -4,7 +4,6 @@ import {
     FsReadDirResult,
     FsStatResult,
     IFileSystemModule,
-    ReadDirOptions,
     RecursiveOptions,
 } from './IFileSystemModule';
 import path from 'node:path';
@@ -58,8 +57,12 @@ export class MemFs implements IFileSystemModule {
         return bString ? oFile.content : Buffer.from(oFile.content);
     }
 
-    async readdir(sPath: string, options?: ReadDirOptions): Promise<FsReadDirResult[]> {
+    async readdir(
+        sPath: string,
+        options?: RecursiveOptions & { withFileTypes: true }
+    ): Promise<string[] | FsReadDirResult[]> {
         sPath = path.normalize(sPath);
+        const bRecursive = options && options.recursive;
         const oLocation = this._root.lookup(sPath);
         const getChildrenOf = function (
             oNode: MemObject,
@@ -80,15 +83,16 @@ export class MemFs implements IFileSystemModule {
             }
             return aResult;
         };
-        if (options && options.recursive) {
+        if (bRecursive) {
             return getChildrenOf(this._root.lookup(sPath));
         } else {
-            return oLocation.getChildren().map(
-                (x: MemObject): FsReadDirResult => ({
-                    name: x.name,
+            const aChildren = oLocation.getChildren();
+            return aChildren.map(
+                (f: MemObject): FsReadDirResult => ({
+                    name: f.name,
                     parentPath: sPath == '' ? '.' : sPath,
                     isDirectory() {
-                        return x.isDirectory;
+                        return f.isDirectory;
                     },
                 })
             );

@@ -1,4 +1,5 @@
 import { MemFs } from '../src/MemFs';
+import path from 'node:path';
 
 describe('mkdir', () => {
     it('should create a directory', async () => {
@@ -42,7 +43,7 @@ describe('readdir', () => {
         const aList = await m.readdir('.');
         expect(aList).toEqual([]);
     });
-    it('should return [] when reading root empty dir', async () => {
+    it('should return [pom, pim, pam] when reading root dir', async () => {
         const m = new MemFs();
         m.mkdir('pom');
         m.mkdir('pim');
@@ -51,8 +52,50 @@ describe('readdir', () => {
         m.mkdir('pim/pouf', { recursive: true });
         m.mkdir('pim/poush', { recursive: true });
         m.writeFile('pim/poush/test1', 'test');
-        const aList = await m.readdir('.');
-        const aNames = aList.map((f) => f.name);
+        const aNames = await m.readdir('.');
         expect(aNames).toEqual(['pom', 'pim', 'pam']);
+    });
+    it('should return [pom, pim, pam, pim/poum, pim/pouf, pim/poush] when reading root dir', async () => {
+        const m = new MemFs();
+        m.mkdir('pom');
+        m.mkdir('pim');
+        m.mkdir('pam');
+        m.mkdir('pim/poum', { recursive: true });
+        m.mkdir('pim/pouf', { recursive: true });
+        m.mkdir('pim/poush', { recursive: true });
+        m.writeFile('pim/poush/test1', 'test');
+        const aList = await m.readdir('.', { recursive: true, withFileTypes: true });
+        expect(aList.map((f) => path.join(f.parentPath, f.name))).toEqual([
+            'pom',
+            'pim',
+            'pim/poum',
+            'pim/pouf',
+            'pim/poush',
+            'pim/poush/test1',
+            'pam',
+        ]);
+    });
+});
+
+describe('mv', () => {
+    it('should rename file', async () => {
+        const m = new MemFs();
+        await m.mkdir('from');
+        await m.mkdir('to');
+        await m.writeFile('from/test.dat', 'test-ééé');
+        expect(m.fileMap).toEqual(['./from', './from/test.dat', './to']);
+        await m.rename('from/test.dat', 'from/rename-1.dat');
+        expect(m.fileMap).toEqual(['./from', './from/rename-1.dat', './to']);
+        const sContent = await m.readFile('from/rename-1.dat');
+        expect(sContent.toString()).toBe('test-ééé');
+    });
+    it('should move file', async () => {
+        const m = new MemFs();
+        await m.mkdir('from');
+        await m.mkdir('to');
+        await m.writeFile('from/test.dat', 'test-ééé');
+        expect(m.fileMap).toEqual(['./from', './from/test.dat', './to']);
+        await m.rename('from/test.dat', 'to/rename-2.dat');
+        expect(m.fileMap).toEqual(['./from', './to', './to/rename-2.dat']);
     });
 });

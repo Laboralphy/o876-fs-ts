@@ -135,34 +135,40 @@ describe('exists', function () {
 describe('ls', function () {
     const mockFS: jest.Mocked<IFileSystemModule> = {
         ...baseMock,
-        readdir: jest.fn((sPath: string, options?: ReadDirOptions): Promise<FsReadDirResult[]> => {
-            if (sPath == 'empty') {
-                return Promise.resolve([]);
-            }
-            if (sPath == 'simple') {
-                const a1: FsReadDirResult = {
-                    name: 'a1',
-                    parentPath: '',
-                    isDirectory(): boolean {
-                        return true;
-                    },
-                };
-                const a2: FsReadDirResult = {
-                    name: 'a2',
-                    parentPath: 'a1',
-                    isDirectory(): boolean {
-                        return false;
-                    },
-                };
-                if (options && options.recursive) {
-                    return Promise.resolve([a1, a2]);
-                } else {
-                    return Promise.resolve([a1]);
+        readdir: jest.fn(
+            (
+                sPath: string,
+                options?: RecursiveOptions & { withFileTypes?: true }
+            ): Promise<FsReadDirResult[]> => {
+                const bRecursive = options && options.recursive;
+                if (sPath == 'empty') {
+                    return Promise.resolve([]);
                 }
-            } else {
-                return Promise.reject(new Error('path ' + sPath + ' not found'));
+                if (sPath == 'simple') {
+                    const a1: FsReadDirResult = {
+                        name: 'a1',
+                        parentPath: '',
+                        isDirectory(): boolean {
+                            return true;
+                        },
+                    };
+                    const a2: FsReadDirResult = {
+                        name: 'a2',
+                        parentPath: 'a1',
+                        isDirectory(): boolean {
+                            return false;
+                        },
+                    };
+                    if (bRecursive) {
+                        return Promise.resolve([a1, a2]);
+                    } else {
+                        return Promise.resolve([a1]);
+                    }
+                } else {
+                    return Promise.reject(new Error('path ' + sPath + ' not found'));
+                }
             }
-        }),
+        ),
     };
 
     it('should return []', function () {

@@ -4,7 +4,6 @@ import {
     BinaryOptions,
     EncodingOptions,
     ForceOptions,
-    FsReadDirResult,
     FsStatResult,
     IFileSystemModule,
     RecursiveOptions,
@@ -79,16 +78,10 @@ export class FsHelper {
      */
     async ls(sPath: string, options: RecursiveOptions = { recursive: false }): Promise<string[]> {
         const { recursive = false } = options;
-        const aDirEnts: FsReadDirResult[] = await this.fs.readdir(sPath, {
-            withFileTypes: true,
+        return this.fs.readdir(sPath, {
+            withFileTypes: false,
             recursive,
         });
-        const aFiles = [];
-        for (const d of aDirEnts) {
-            const sEntryPath = path.join(d.parentPath, d.name);
-            aFiles.push(sEntryPath);
-        }
-        return aFiles;
     }
 
     /**
