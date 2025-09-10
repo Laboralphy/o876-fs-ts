@@ -1,9 +1,4 @@
-import {
-    FsReadDirResult,
-    FsStatResult,
-    IFileSystemModule,
-    RecursiveOptions,
-} from '../src/IFileSystemModule';
+import { FsStatResult, IFileSystemModule, RecursiveOptions } from '../src/IFileSystemModule';
 import { FsHelper } from '../src/FsHelper';
 
 const baseMock = {
