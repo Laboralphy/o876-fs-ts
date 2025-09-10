@@ -86,6 +86,20 @@ export class FsHelper {
     }
 
     /**
+     * Juste like ls -r but for files only.
+     * This method is for finding all files in a folder, and its sub-folders, and its sub-sub-folders...
+     * Returns a list of all files, with their path.
+     * @param sPath {string}
+     */
+    async files(sPath: string) {
+        const aFiles = await this.fs.readdir(sPath, {
+            withFileTypes: true,
+            recursive: true,
+        });
+        return aFiles.filter((f) => !f.isDirectory()).map((f) => path.join(f.parentPath, f.name));
+    }
+
+    /**
      * Remove the specified file,
      * If directory is specified, remove all files and folders recursively inside the specified directory
      * @param sPath location or file name to be removed

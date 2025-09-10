@@ -1,89 +1,31 @@
-# o876-fs-ts
+# FsHelper – Helper for Common Filesystem Operations
 
-This package is used as a façade of **fs**.
+A lightweight utility class to simplify common filesystem operations in Node.js, with support for custom filesystem modules.
 
-## methods
+## Features
 
-### stat
+- **Simplified API**: Wraps `fs/promises` with a cleaner, more intuitive interface.
+- **Type Safety**: Fully typed with TypeScript.
+- **Customizable**: Accepts a custom filesystem module for testing or special use cases.
+- **Recursive Operations**: Supports recursive directory creation, listing, and deletion.
 
-Returns a structure describing a file.
+---
 
-```typescript
-stat(sPath: string): Promise<FsStatResult>;
-```
+## Examples
+Create a Directory
+await fsHelper.mkdir('/path/to/new/dir');
+List Files Recursively
+const files = await fsHelper.ls('/path/to/dir', { recursive: true });
+console.log(files);
+Read and Write a File
+await fsHelper.write('/path/to/file.txt', 'Hello, world!');
+const content = await fsHelper.read('/path/to/file.txt');
+console.log(content); // "Hello, world!"
+Remove a Directory Recursively
+await fsHelper.rm('/path/to/dir', { recursive: true });
 
-#### Parameters
+Error Handling
+All methods throw errors for invalid operations (e.g., missing files, permission issues). Use try/catch or .catch() to handle errors.
 
-| Parameter     | Type    | Description         |
-|---------------|---------|---------------------|
-| sPath         | string  | Path to file        |
-
-#### Returned value
-
-A promise of FsStatResult.
-
-```typescript
-export interface FsStatResult {
-    isDirectory(): boolean; // returns true if the file is a directory
-    size: number; // size of the file (if it is a regular file)
-    birthtimeMs: number; // Timestamp of file creation
-    mtimeMs: number; // last timestamp the file has been modified
-    atimeMs: number; // last timestamp the file has been accessed to
-}
-```
-
-### mkdir
-
-Creates a new folder, or a new path if recursive mode is set.
-
-```typescript
-mkdir(sPath: string, options?: RecursiveOptions): Promise<void>;
-```
-
-#### Parameters
-
-| Parameter     | Type               | Description                                                                                                                 |
-|---------------|--------------------|-----------------------------------------------------------------------------------------------------------------------------|
-| sPath         | string             | Path to file                                                                                                                |
-| options       | RecursiveOptions   | The only option is "recursive", a boolean. If true then a full path can be created event if intermediate folder don't exist |
-
-```typescript
-export type RecursiveOptions = {
-    recursive?: boolean;
-};
-```
-
-#### Returned value
-
-A promise of void
-
-### readdir
-
-
-
-
-
-    readdir(
-        sPath: string,
-        options?: RecursiveOptions & { withFileTypes: true }
-    ): Promise<FsReadDirResult[]>;
-    rename(sOldPath: string, sNewPath: string): Promise<void>;
-    writeFile(sPath: string, data: string | Buffer, options?: EncodingOptions): Promise<void>;
-    readFile(sPath: string, options?: EncodingOptions): Promise<Buffer | string>;
-    rm(sPath: string, options?: RecursiveOptions & ForceOptions): Promise<void>;
-
-```typescript
-import { FsHelper } from 'FsHelper';
-
-const m = new FsHelper();
-```
-
-or
-
-```typescript
-import { FsHelper } from 'FsHelper';
-import { MemFs } from 'MemFs';
-
-const m = new FsHelper(new MemFs());
-```
-
+License
+MIT
