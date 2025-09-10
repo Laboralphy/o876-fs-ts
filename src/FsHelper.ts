@@ -76,8 +76,8 @@ export class FsHelper {
      * @param sPath location to be listed
      * @param options listing options
      */
-    async ls(sPath: string, options: RecursiveOptions = { recursive: false }): Promise<string[]> {
-        const { recursive = false } = options;
+    async ls(sPath: string, options?: RecursiveOptions): Promise<string[]> {
+        const { recursive = false } = options ?? {};
         const aFiles = await this.fs.readdir(sPath, {
             withFileTypes: true,
             recursive,

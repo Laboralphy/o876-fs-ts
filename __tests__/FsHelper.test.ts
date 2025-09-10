@@ -2,7 +2,6 @@ import {
     FsReadDirResult,
     FsStatResult,
     IFileSystemModule,
-    ReadDirOptions,
     RecursiveOptions,
 } from '../src/IFileSystemModule';
 import { FsHelper } from '../src/FsHelper';
@@ -133,20 +132,58 @@ describe('exists', function () {
 });
 
 describe('ls', function () {
-    const mockFS: jest.Mocked<IFileSystemModule> = {
-        ...baseMock,
+    const lsMock: jest.Mocked<IFileSystemModule> = {
+        stat: jest.fn().mockResolvedValue({
+            isDirectory: () => false,
+            size: 0,
+            birthtimeMs: 0,
+            mtimeMs: 0,
+            atimeMs: 0,
+        }),
+        mkdir: jest.fn().mockResolvedValue(undefined),
+        readdir: jest.fn((sPath: string, options?: RecursiveOptions & { withFileTypes: true }) => {
+            if (sPath === 'simple') {
+                if (options && options.recursive) {
+                    return Promise.resolve([
+                        {
+                            name: 'a1',
+                            parentPath: '.',
+                            isDirectory: () => true,
+                        },
+                        {
+                            name: 'a2',
+                            parentPath: 'a1',
+                            isDirectory: () => false,
+                        },
+                    ]);
+                } else {
+                    return Promise.resolve([
+                        {
+                            name: 'a1',
+                            parentPath: '.',
+                            isDirectory: () => true,
+                        },
+                    ]);
+                }
+            }
+            return Promise.resolve([]);
+        }),
+        rename: jest.fn().mockResolvedValue(undefined),
+        writeFile: jest.fn().mockResolvedValue(undefined),
+        readFile: jest.fn().mockResolvedValue(Buffer.from('')),
+        rm: jest.fn().mockResolvedValue(undefined),
     };
 
     it('should return []', function () {
-        const fs = new FsHelper(mockFS);
+        const fs = new FsHelper(lsMock);
         expect(fs.ls('empty')).resolves.toEqual([]);
     });
     it('should return ["a1"]', function () {
-        const fs = new FsHelper(mockFS);
-        expect(fs.ls('simple')).resolves.toEqual([]);
+        const fs = new FsHelper(lsMock);
+        expect(fs.ls('simple')).resolves.toEqual(['a1']);
     });
     it('should return ["a1", "a1/a2"]', async function () {
-        const fs = new FsHelper(mockFS);
-        expect(await fs.ls('simple', { recursive: true })).toEqual([]);
+        const fs = new FsHelper(lsMock);
+        expect(await fs.ls('simple', { recursive: true })).toEqual(['a1', 'a1/a2']);
     });
 });
