@@ -1,0 +1,14 @@
+#!/bin/bash
+npm init -y
+npm install --save-dev \
+        @types/jest \
+        @types/node \
+        eslint \
+        eslint-config-prettier \
+        eslint-plugin-prettier \
+        jest \
+        prettier \
+        ts-jest \
+        tsx \
+        typescript \
+        typescript-eslint \

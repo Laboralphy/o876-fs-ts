@@ -2,9 +2,10 @@
   "name": "o876-fs-ts",
   "version": "1.0.0",
   "description": "",
-  "main": "src/FsHelper.ts",
+  "main": "./dist/index.js",
   "type": "module",
   "scripts": {
+    "build": "tsc",
     "test": "jest",
     "test:watch": "jest --watch",
     "eslint:fix": "eslint --fix"
